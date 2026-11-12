@@ -127,6 +127,10 @@ TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_PYTHON_VERSION=$(TOOLS_PYTHON_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_NODE_VERSION=$(TOOLS_NODE_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg ALPINE_VERSION=$(ALPINE_VERSION)
+# Optional extra build args for constrained networks (e.g. GOPROXY mirror).
+# Empty by default; set EXTRA_BUILD_ARGS on the command line or in .env.
+EXTRA_BUILD_ARGS ?=
+TOOLS_IMAGE_BUILD_ARGS += $(EXTRA_BUILD_ARGS)
 
 
 ##@ General
@@ -238,6 +242,18 @@ HELM_ACTION=upgrade --install
 
 # Helm chart variables
 MODEL_PROVIDER ?= openAI
+
+# Bundled PostgreSQL image. Default points at the public ECR mirror of the
+# official postgres:18-alpine digest, because Docker Hub is blocked on this
+# network edge. Override to pull from elsewhere.
+BUNDLED_POSTGRES_IMAGE ?= public.ecr.aws/docker/library/postgres@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+
+# Substrate object-store images, redirected to reachable registries that carry
+# the identical digests to the chart's Docker Hub defaults (verified bit-for-bit).
+# quay.io/rustfs/rustfs:1.0.3 and public.ecr.aws/aws-cli/aws-cli:2.38.5 mirror the
+# same manifests, so the digest pins stay valid while avoiding blocked Docker Hub.
+SUBSTRATE_RUSTFS_IMAGE ?= quay.io/rustfs/rustfs:1.0.3@sha256:9ca9559533b537d10482fe923288b676ad08f92a7069d9a17327fbae3cab688b
+SUBSTRATE_AWSCLI_IMAGE ?= public.ecr.aws/aws-cli/aws-cli:2.38.5@sha256:c8156a0e74e13929a42d7e60f0d4e14e7d28d980cd21822505d4bff80e5460c1
 
 
 ##@ Build
@@ -620,8 +636,8 @@ kagent-cli-deploy: ## Build CLI locally and install kagent with Substrate and th
 kagent-cli-deploy: use-kind-cluster build-cli-local helm-dev
 	@printf '%s\n' 'registry: "$(DOCKER_REGISTRY)"' 'tag: "$(VERSION)"' 'imagePullPolicy: Always' 'controller: {image: {pullPolicy: Always}}' 'ui: {image: {pullPolicy: Always}}' > go/core/bin/local-values.yaml
 	@printf '%s\n' 'atelet:' '  extraArgs: [--localhost-registry-replacement=kind-registry:5000]' > go/core/bin/local-atelet-values.yaml
-	@printf '%s\n' 'ateApi:' '  extraArgs: [--template-resync-interval=250ms]' > go/core/bin/local-substrate-values.yaml
-	@printf '%s\n' 'install:' '  defaultModelProvider: $(shell printf "%s" "$(MODEL_PROVIDER)" | awk "{print toupper(substr(\$$0,1,1)) substr(\$$0,2)}")' '  kagent:' '    repository: "$(abspath $(HELM_SOURCE_DIR))/"' '    version: "$(VERSION)"' '    valuesFiles: [local-values.yaml]' '  substrate:' '    repository: "$(SUBSTRATE_REPO)/"' '    version: "$(SUBSTRATE_VERSION)"' '    valuesFiles: [local-substrate-values.yaml]' '  atelet:' '    valuesFiles: [local-atelet-values.yaml]' '  podCertificate:' '    repository: "$(SUBSTRATE_PODCERT_REPO)/"' '    version: "$(SUBSTRATE_PODCERT_VERSION)"' > go/core/bin/local-config.yaml
+	@printf '%s\n' 'ateApi:' '  extraArgs: [--template-resync-interval=250ms]' 'images:' '  rustfs: "$(SUBSTRATE_RUSTFS_IMAGE)"' '  awsCli: "$(SUBSTRATE_AWSCLI_IMAGE)"' > go/core/bin/local-substrate-values.yaml
+	@printf '%s\n' 'install:' '  defaultModelProvider: $(shell printf "%s" "$(MODEL_PROVIDER)" | awk "{print toupper(substr(\$$0,1,1)) substr(\$$0,2)}")' '  bundledPostgresImage: "$(BUNDLED_POSTGRES_IMAGE)"' '  kagent:' '    repository: "$(abspath $(HELM_SOURCE_DIR))/"' '    version: "$(VERSION)"' '    valuesFiles: [local-values.yaml]' '  substrate:' '    repository: "$(SUBSTRATE_REPO)/"' '    version: "$(SUBSTRATE_VERSION)"' '    valuesFiles: [local-substrate-values.yaml]' '  atelet:' '    valuesFiles: [local-atelet-values.yaml]' '  podCertificate:' '    repository: "$(SUBSTRATE_PODCERT_REPO)/"' '    version: "$(SUBSTRATE_PODCERT_VERSION)"' > go/core/bin/local-config.yaml
 	@KUBECONFIG=$(KIND_KUBECONFIG) ./go/core/bin/kagent-local --config go/core/bin/local-config.yaml install
 
 .PHONY: kagent-cli-port-forward

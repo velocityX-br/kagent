@@ -700,13 +700,16 @@ providers:
   annotations: {}
   openAI:
     provider: OpenAI
-    model: "gpt-5-mini"
+    model: "gpt-5.5"
     apiKeySecretRef: kagent-openai
     apiKeySecretKey: OPENAI_API_KEY
     # Provider options rendered into spec.openAI of the generated ModelConfig.
     # The Codex runtime requires the Responses API; the kagent runtime supports both.
+    # Routed through the local SAP HAI Proxy's LiteLLM backend (OpenAI-compatible
+    # chat completions), reached from inside the kind cluster via host.docker.internal.
     config:
-      apiFormat: responses
+      apiFormat: chatCompletions
+      baseUrl: "http://host.docker.internal:6655/litellm/v1"
     # apiKey: ""
     # Optional TLS settings for the generated ModelConfig.
     # This same block can be used under any provider.

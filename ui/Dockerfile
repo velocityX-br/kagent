@@ -40,6 +40,9 @@ RUN yarn build \
 # A static binary, so the runtime image needs no shell to render settings at start.
 FROM --platform=$BUILDPLATFORM $GO_IMAGE AS entrypoint
 ARG TARGETARCH
+ARG GOPROXY
+ARG GOFLAGS
+ARG GOSUMDB
 WORKDIR /src
 COPY entrypoint/ .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w" -o /entrypoint . \
