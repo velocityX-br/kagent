@@ -22,6 +22,9 @@ COPY pkg/ pkg/
 
 # Build
 ARG LDFLAGS
+ARG GOPROXY
+ARG GOFLAGS
+ARG GOSUMDB
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw             \
     --mount=type=cache,target=/root/.cache/go-build,rw        \
     echo "Building on $BUILDPLATFORM -> linux/$TARGETARCH" && \

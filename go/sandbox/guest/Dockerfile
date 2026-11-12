@@ -11,6 +11,9 @@ COPY core/pkg/env/ core/pkg/env/
 COPY pkg/logging/ pkg/logging/
 COPY sandbox/guest/cmd/ sandbox/guest/cmd/
 
+ARG GOPROXY
+ARG GOFLAGS
+ARG GOSUMDB
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw \
     --mount=type=cache,target=/root/.cache/go-build,rw \
     CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH \

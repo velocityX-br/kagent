@@ -12,6 +12,9 @@ COPY adk/ adk/
 COPY core/ core/
 COPY harness/ harness/
 COPY pkg/ pkg/
+ARG GOPROXY
+ARG GOFLAGS
+ARG GOSUMDB
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw \
     --mount=type=cache,target=/root/.cache/go-build,rw \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
@@ -31,8 +34,11 @@ RUN apk upgrade --no-cache && apk add --no-cache bash ca-certificates git libgcc
         arm64) platform="linux-arm64-musl"; checksum="${CLAUDE_CODE_ARM64_SHA256}" ;; \
         *) echo "unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && wget -T 60 -t 3 -O /usr/local/bin/claude \
-        "https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}/${platform}/claude" \
+    && wget -T 60 -t 3 -O /tmp/claude-code.tgz \
+        "https://registry.npmjs.org/@anthropic-ai/claude-code-${platform}/-/claude-code-${platform}-${CLAUDE_CODE_VERSION}.tgz" \
+    && tar -xzf /tmp/claude-code.tgz -C /tmp package/claude \
+    && mv /tmp/package/claude /usr/local/bin/claude \
+    && rm -rf /tmp/claude-code.tgz /tmp/package \
     && echo "${checksum}  /usr/local/bin/claude" | sha256sum -c - \
     && chmod 0755 /usr/local/bin/claude \
     && addgroup -S -g 65532 kagent \
